@@ -9,6 +9,7 @@ type Env = {
   WALLET_ADDRESS: string;
   CDP_API_KEY_ID: string;
   CDP_API_KEY_SECRET: string;
+  INTERNAL_SECRET: string;
   CACHE: KVNamespace;
 };
 
@@ -81,6 +82,12 @@ async function requirePayment(
   description: string,
   name: string
 ): Promise<Response | null> {
+  // Internal auth from sibling services (Checkpoint402 enhance pipeline)
+  const internalAuth = c.req.header("X-Internal-Auth");
+  if (internalAuth && c.env.INTERNAL_SECRET && internalAuth === c.env.INTERNAL_SECRET) {
+    return null; // Bypass payment for internal calls
+  }
+
   const header =
     c.req.header("X-Payment") || c.req.header("x-payment");
 
