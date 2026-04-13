@@ -1,0 +1,10 @@
+name = "data402"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+WALLET_ADDRESS = "0xEF6a2101eaBE4FD682aeA512C87BC26E191D882b"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "c59d7bcc01f7448781b6e282c2dc8ae0"
