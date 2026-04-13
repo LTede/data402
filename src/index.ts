@@ -76,6 +76,20 @@ function paymentRequired(c: any, price: string, description: string, name: strin
 
 // ── Payment verification helper ──
 
+const FREE_TIER_LIMIT = 100; // requests per day per IP
+
+async function checkFreeTier(c: any): Promise<boolean> {
+  const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown";
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const key = `ratelimit:${ip}:${today}`;
+
+  const current = parseInt((await c.env.CACHE.get(key)) || "0");
+  if (current >= FREE_TIER_LIMIT) return false;
+
+  await c.env.CACHE.put(key, String(current + 1), { expirationTtl: 86400 });
+  return true;
+}
+
 async function requirePayment(
   c: any,
   requirements: PaymentRequirements,
@@ -85,11 +99,16 @@ async function requirePayment(
   // Internal auth from sibling services (Checkpoint402 enhance pipeline)
   const internalAuth = c.req.header("X-Internal-Auth");
   if (internalAuth && c.env.INTERNAL_SECRET && internalAuth === c.env.INTERNAL_SECRET) {
-    return null; // Bypass payment for internal calls
+    return null;
   }
 
-  const header =
-    c.req.header("X-Payment") || c.req.header("x-payment");
+  // Free tier: 100 requests/day per IP (no payment needed)
+  if (await checkFreeTier(c)) {
+    return null;
+  }
+
+  // Over free tier — require x402 payment
+  const header = c.req.header("X-Payment") || c.req.header("x-payment");
 
   if (!header) {
     return paymentRequired(c, requirements.amount, description, name);
@@ -109,7 +128,7 @@ async function requirePayment(
     );
   }
 
-  return null; // Payment OK, proceed
+  return null;
 }
 
 // ── Health check ──
